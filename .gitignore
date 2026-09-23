@@ -1,8 +1,0 @@
-node_modules/
-harness/logs/
-harness/last-judge.log
-harness/judge-result.json
-harness/.judge-state.json
-game/data/
-game/test-results/
-game/playwright-report/

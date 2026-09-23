@@ -1,5 +1,0 @@
-완료 커밋: f66678d
-검증: 커밋 f66678d 에서 외부 심판(node harness/judge.mjs, npm ci 포함 전체 모드)을 코드 변경 없이 연속 2회 실행 → 2회 모두 25/25 통과.
-      npm run verify: typecheck·lint·build·test(78)·e2e(4) 전부 통과, 82/82 테스트, AC-01~AC-20 전부 pass.
-요약: 풍운록 — 브라우저 2D 타일 멀티플레이 RPG (마을 1 + 사냥터 2, 직업 4종·스킬 8개, 몬스터 6종, 아이템·상점·저장).
-실행: cd game && npm install && npm run build && npm start → http://localhost:3000
