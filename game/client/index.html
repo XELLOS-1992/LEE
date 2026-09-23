@@ -4,8 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>풍운록</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" />
   <style>
-    :root { --ink: #f4ecd8; --panel: rgba(28, 22, 16, 0.92); --edge: #b8914a; --accent: #d8b25a; }
+    :root { color-scheme: dark; --ink: #f4ecd8; --panel: rgba(28, 22, 16, 0.92); --edge: #b8914a; --accent: #d8b25a; }
     * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; overflow: hidden; background: #120e0a; color: var(--ink);
       font-family: "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
@@ -34,6 +35,7 @@
     .slot canvas { width: 32px; height: 32px; image-rendering: pixelated; }
     .slot .qty { position: absolute; right: 2px; bottom: 0; font-size: 11px; }
     .slot:hover { outline: 1px solid var(--accent); }
+    .offline-note { font-size: 13px; opacity: .7; margin: 0; }
     .help { font-size: 12px; opacity: .75; margin-top: 8px; line-height: 1.5; }
   </style>
 </head>

@@ -190,3 +190,38 @@ test("AC-13 주모에게 말을 걸어 물약을 산다 (UI)", async ({ page }) 
   expect(inv.some((s) => s?.item === "potion_blue")).toBe(true);
   await page.screenshot({ path: "test-results/screens/ac13-shop.png" });
 });
+
+test("AC-19 서버 없는 단일 파일판: 접속→이동→채팅, 새로고침 후에도 위치 유지", async ({ page }) => {
+  const file = `file://${process.cwd()}/dist/offline/pungunrok.html`;
+  const name = `혼자${uniq()}`;
+  await page.goto(file);
+  await expect(page.locator(".offline-note")).toBeVisible();
+  await page.fill("#name", name);
+  await page.click("#start");
+  await page.waitForFunction(() => !!window.__game?.state.me && !!window.__game.state.snapshot && !!window.__game.state.self);
+  const start = await me(page);
+  await step(page, "ArrowUp");
+  await step(page, "ArrowUp");
+  const moved = await me(page);
+  expect([moved.x, moved.y]).toEqual([start.x, start.y - 2]);
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("혼자서도 잘해요");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => window.__game.state.chat.some((c) => c.text === "혼자서도 잘해요"));
+  const pixels = await page.evaluate(() => {
+    const c = document.getElementById("game") as HTMLCanvasElement;
+    const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+    const colors = new Set<number>();
+    for (let i = 0; i < d.length; i += 4 * 11) colors.add((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]);
+    return colors.size;
+  });
+  expect(pixels).toBeGreaterThan(50);
+  await page.screenshot({ path: "test-results/screens/offline.png" });
+
+  await page.reload();
+  await page.fill("#name", name);
+  await page.click("#start");
+  await page.waitForFunction(() => !!window.__game?.state.me);
+  const again = await page.evaluate(() => window.__game.state.me as unknown as { x: number; y: number });
+  expect([again.x, again.y]).toEqual([moved.x, moved.y]);
+});

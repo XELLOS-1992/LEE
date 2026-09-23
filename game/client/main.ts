@@ -71,7 +71,9 @@ function send(msg: ClientMsg) {
 
 function connect(name: string, job: string) {
   const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
-  ws = new WebSocket(url);
+  // 단일 파일판(offline.ts)은 서버 대신 브라우저 안의 월드로 연결하는 함수를 넣어 둔다
+  const create = (window as unknown as { __createSocket?: (u: string) => WebSocket }).__createSocket;
+  ws = create ? create(url) : new WebSocket(url);
   ws.onopen = () => {
     state.connected = true;
     send({ t: "login", name, job } as ClientMsg);
