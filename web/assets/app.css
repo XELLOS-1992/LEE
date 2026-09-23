@@ -316,6 +316,7 @@ input[type=range], input[type=checkbox], input[type=radio] { accent-color: var(-
 .err { color: var(--danger); background: var(--danger-weak); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
 .note-banner { display: flex; gap: 10px; align-items: center; padding: 8px 20px; background: #fff8e6; color: #8a5a00; font-size: 12.5px; border-bottom: 1px solid #f5e3b5; }
 :root[data-theme="dark"] .note-banner { background: #3a2f12; color: #f2c96b; border-color: #4d3f18; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .note-banner { background: #3a2f12; color: #f2c96b; border-color: #4d3f18; } :root:not([data-theme="light"]) .chip.warn { background: #3a2f12; color: #f2c96b; } }
 
 /* ------------------------------------------------ player */
 .player { flex: none; border-top: 1px solid var(--line); background: var(--panel); padding: 10px 20px 12px; display: flex; align-items: center; gap: 14px; }
