@@ -1,4 +1,4 @@
-import { h, icon, api, modal, toast, uploadFile, download, fmtDur } from './util.js';
+import { h, icon, api, modal, toast, uploadFile, download, fmtDur, promptDialog } from './util.js';
 import { S, go, reloadAll, refreshState, applyTheme } from './app.js';
 
 export const LANGS = [['ko', '한국어'], ['en', 'English'], ['ja', '日本語'], ['zh', '中文'], ['auto', '자동 감지']];
@@ -95,7 +95,7 @@ export function moveToFolder(note, done) {
       h('button', { class: `nav-item${!note.folder_id ? ' active' : ''}`, onclick: () => pick(null) }, icon('notes'), '폴더 없음'),
       folders.map((f) => h('button', { class: `nav-item${note.folder_id === f.id ? ' active' : ''}`, onclick: () => pick(f.id) }, icon('folder'), f.name)),
       h('button', { class: 'nav-item', onclick: async () => {
-        const name = prompt('새 폴더 이름');
+        const name = await promptDialog('새 폴더', '', { placeholder: '폴더 이름', ok: '만들기' });
         if (!name) return;
         const f = await api('/api/folders', { method: 'POST', body: { name } });
         pick(f.id);
@@ -247,6 +247,7 @@ export async function openSettings(tab = 'asr') {
       p.push(row('단축키', null, h('div', { style: { fontSize: '12.5px', color: 'var(--text-2)', textAlign: 'right', lineHeight: 1.9 } },
         'Space 재생/정지 · ←/→ 이동 · ⌘F 대화 검색', h('br'), '⌘K 노트 검색 · ⌘U 업로드 · ⇧⌘R 녹음 · ⌘, 설정')));
       p.push(row(`회의노트 ${st.version}`, '모든 녹음과 회의록은 이 Mac에 저장됩니다', h('button', { class: 'btn danger', onclick: async () => {
+        if (window.__meetnoteNative) { window.webkit.messageHandlers.meetnote.postMessage({ type: 'quit' }); return; }
         await api('/api/app/quit', { method: 'POST' }); document.body.innerHTML = '<div class="empty"><h3>회의노트를 종료했습니다</h3>이 창을 닫아도 됩니다.</div>';
       } }, icon('logout', 'sm'), '앱 종료')));
     }

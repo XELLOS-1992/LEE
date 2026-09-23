@@ -63,19 +63,23 @@ def windows(regions: list[tuple[float, float]], total: float, max_len: float = 2
             max_gap: float = 1.5, pad: float = 0.25) -> list[tuple[float, float]]:
     """Group VAD regions into windows of at most `max_len` seconds.
 
-    Long silences between regions are skipped, which is what stops Whisper
-    from hallucinating on quiet stretches.
+    Regions closer than `max_gap` are merged (gaps measured before padding);
+    long silences between windows are skipped, which is what stops Whisper
+    from hallucinating on quiet stretches. Padding never crosses into the
+    neighbouring window.
     """
-    wins: list[list[float]] = []
+    groups: list[list[float]] = []
     for s, e in regions:
-        s, e = max(0.0, s - pad), min(total, e + pad)
-        if wins and (s - wins[-1][1] <= max_gap) and (e - wins[-1][0] <= max_len):
-            wins[-1][1] = max(wins[-1][1], e)
+        if groups and (s - groups[-1][1] <= max_gap) and (e - groups[-1][0] <= max_len):
+            groups[-1][1] = max(groups[-1][1], e)
         else:
-            wins.append([s, e])
-    # A single region can exceed max_len when VAD never saw a pause.
+            groups.append([s, e])
     out = []
-    for s, e in wins:
+    for i, (s, e) in enumerate(groups):
+        lo = (groups[i - 1][1] + s) / 2 if i else 0.0
+        hi = (e + groups[i + 1][0]) / 2 if i + 1 < len(groups) else total
+        s, e = max(lo, s - pad), min(hi, e + pad)
+        # A single region can exceed max_len when VAD never saw a pause.
         while e - s > max_len + 0.5:
             out.append((s, s + max_len))
             s += max_len

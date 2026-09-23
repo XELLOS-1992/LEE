@@ -64,7 +64,7 @@ def _tidy(turns, forced: bool):
     # Clusters with almost no speech are usually a voice caught on a cough or
     # overlap; fold them into the neighbouring speaker (unless count was fixed).
     if not forced and len(talk) > 1:
-        tiny = {k for k, v in talk.items() if v < 3.0 or v / total < 0.02}
+        tiny = {k for k, v in talk.items() if v < 1.0 or (total > 120 and v / total < 0.015)}
         if tiny and len(tiny) < len(talk):
             fixed = []
             for i, (s, e, k) in enumerate(turns):

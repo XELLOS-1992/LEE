@@ -55,7 +55,8 @@ def nouns(text: str) -> list[str]:
     return out
 
 
-QUESTION_END = re.compile(r"(까|까요|나요|니|니까|가요|죠|을까|ㄹ까|는지|습니까|입니까|어때|어때요|뭐야|뭐예요|거야|거예요)$")
+QUESTION_END = re.compile(r"(까|까요|나요|니|가요|을까|는지|습니까|입니까|어때|어때요|뭐야|뭐예요|는가|은가|던가|지요\?)$")
+INTERJ = re.compile(r"^(네|예|아|음|어|자|그래|좋아요|맞아요)\s+(?=\S)")
 
 
 def punctuate(text: str) -> str:
@@ -69,15 +70,29 @@ def punctuate(text: str) -> str:
     if k is None:
         return text
     try:
-        sents = [s.text.strip() for s in k.split_into_sents(text)]
+        raw = k.split_into_sents(text, return_tokens=True)
     except Exception:
         return text
+    # Kiwi sometimes splits after a topic phrase ('…중 하나는 | 자기 아이를…');
+    # only treat a split as a sentence end when it closes on a final ending.
+    sents: list[str] = []
+    carry = ""
+    for sent in raw:
+        chunk = (carry + " " + sent.text.strip()).strip()
+        toks = [t for t in (sent.tokens or []) if not t.tag.startswith("S")]
+        ends = bool(re.search(r"[.?!…。？！]$", chunk)) or (toks and toks[-1].tag in ("EF", "IC"))
+        if ends:
+            sents.append(chunk)
+            carry = ""
+        else:
+            carry = chunk
+    if carry:
+        sents.append(carry)
     out = []
     for s in sents:
-        if not s:
-            continue
         if not re.search(r"[.?!…。？！,]$", s):
             s += "?" if QUESTION_END.search(s) else "."
+        s = INTERJ.sub(lambda m: m.group(1) + ", ", s)
         out.append(s)
     return " ".join(out)
 

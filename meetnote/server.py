@@ -11,6 +11,7 @@ import subprocess
 import sys
 import threading
 import time
+from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
@@ -26,7 +27,17 @@ log = logging.getLogger("meetnote.server")
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 ALLOWED_HOSTS = {"127.0.0.1", "localhost", "[::1]"}
 
-app = FastAPI(title="MeetNote", docs_url=None, redoc_url=None)
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    db.init()
+    _recover_recordings()
+    pipeline.start()
+    yield
+
+
+app = FastAPI(title="MeetNote", docs_url=None, redoc_url=None, lifespan=lifespan)
 
 
 @app.middleware("http")
@@ -41,13 +52,6 @@ async def guard(request: Request, call_next):
         if request.headers.get("x-meetnote") != "1":
             return JSONResponse({"detail": "missing header"}, status_code=403)
     return await call_next(request)
-
-
-@app.on_event("startup")
-def _startup() -> None:
-    db.init()
-    _recover_recordings()
-    pipeline.start()
 
 
 # ------------------------------------------------------------------ helpers

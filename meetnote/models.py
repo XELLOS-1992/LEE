@@ -18,6 +18,7 @@ import httpx
 from . import config
 
 log = logging.getLogger("meetnote.models")
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 GH = "https://github.com/k2-fsa/sherpa-onnx/releases/download"
 

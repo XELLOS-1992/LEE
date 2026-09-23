@@ -40,7 +40,7 @@ class SenseVoiceEngine(Engine):
         rec = sensevoice_recognizer(language)
         total = len(audio) / SR
         # SenseVoice is trained on short utterances: feed each VAD region on its own.
-        wins = windows(vad_regions(audio, min_silence=0.5, max_speech=20.0, threshold=0.5), total, max_len=20.0, max_gap=0.0, pad=0.3)
+        wins = windows(vad_regions(audio, min_silence=0.3, max_speech=20.0, threshold=0.5), total, max_len=20.0, max_gap=0.0, pad=0.15)
         out: list[dict] = []
         batch = 8
         for b in range(0, len(wins), batch):

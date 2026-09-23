@@ -7,6 +7,7 @@ let REC = null;
 
 export const isRecording = () => !!REC && !REC.stopped;
 export const currentRecording = () => (isRecording() ? REC : null);
+window.__meetnoteRecording = isRecording;  // asked by the Mac app before quitting
 
 export async function startRecording(opts = {}) {
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('이 창에서는 마이크를 사용할 수 없습니다. 설정 > 일반 > 브라우저에서 열기를 이용하세요.');
