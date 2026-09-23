@@ -4,38 +4,51 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>풍운록</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;700&display=swap" />
   <style>
-    :root { color-scheme: dark; --ink: #f4ecd8; --panel: rgba(28, 22, 16, 0.92); --edge: #b8914a; --accent: #d8b25a; }
+    :root { color-scheme: light; --ink: #3a2a1a; --panel: #fffaf0; --edge: #c9a36a; --accent: #ff9a1a; --navy: #2a3250; --sky: #8fd3ff; }
     * { box-sizing: border-box; }
-    html, body { margin: 0; height: 100%; overflow: hidden; background: #120e0a; color: var(--ink);
+    html, body { margin: 0; height: 100%; overflow: hidden; background: var(--sky); color: var(--ink);
       font-family: "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
     #wrap { position: fixed; inset: 0; }
-    #game { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; background: #000; }
-    .panel { position: absolute; background: var(--panel); border: 2px solid var(--edge); border-radius: 4px; padding: 12px; }
+    #game { display: block; width: 100vw; height: 100vh; background: var(--sky); }
+    .panel { position: absolute; background: var(--panel); border: 3px solid var(--edge); border-radius: 14px; padding: 14px;
+      box-shadow: 0 6px 0 rgba(90, 60, 20, 0.25), 0 10px 30px rgba(0, 0, 0, 0.25); }
     .hidden { display: none !important; }
     #login { inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
-      background: radial-gradient(circle at 50% 40%, #3a2c1c, #120e0a 70%); border: none; }
-    #login h1 { margin: 0; font-size: 56px; letter-spacing: 12px; color: var(--accent); text-shadow: 0 3px 0 #5a3a12; }
-    #login p { margin: 0 0 12px; opacity: .8; }
-    #login input, #login select, #login button, #chat-input { font: inherit; font-size: 16px; padding: 8px 10px;
-      border: 2px solid var(--edge); background: #241c14; color: var(--ink); border-radius: 3px; }
-    #login button { background: var(--edge); color: #1a120a; font-weight: 700; cursor: pointer; min-width: 200px; }
-    #login-error { color: #ff8a80; min-height: 1.2em; }
-    #chat-input { position: absolute; left: 12px; bottom: 12px; width: min(520px, calc(100vw - 24px)); }
+      background: transparent; border: none; box-shadow: none; padding: 16px; }
+    #login h1 { margin: 0; font-family: "Jua", "Noto Sans KR", sans-serif; font-weight: 400; font-size: clamp(56px, 12vw, 96px);
+      letter-spacing: 6px; color: #ffb22a; -webkit-text-stroke: 3px #7a3a00; paint-order: stroke fill;
+      text-shadow: 0 6px 0 #7a3a00; animation: bob 2.4s ease-in-out infinite; }
+    @keyframes bob { 50% { transform: translateY(-6px); } }
+    @media (prefers-reduced-motion: reduce) { #login h1 { animation: none; } }
+    #login p { margin: 0 0 8px; color: #24486a; font-weight: 700; text-shadow: 0 1px 0 #fff; }
+    #login .card { display: flex; flex-direction: column; gap: 10px; width: min(340px, 100%); background: var(--panel);
+      border: 3px solid var(--edge); border-radius: 16px; padding: 18px; box-shadow: 0 6px 0 rgba(90, 60, 20, 0.25); }
+    #login input, #login select, #chat-input { font: inherit; font-size: 16px; padding: 10px 12px;
+      border: 2px solid var(--edge); background: #ffffff; color: var(--ink); border-radius: 10px; }
+    #login button, #dialog .shop button, #dialog .close, #inventory button {
+      font: inherit; font-weight: 700; color: #ffffff; cursor: pointer; border-radius: 10px; border: 2px solid #b85a00;
+      background: linear-gradient(#ffc24a, #ff8a1a); text-shadow: 0 1px 0 #a04a00; box-shadow: 0 3px 0 #b85a00; }
+    #login button { padding: 10px; font-size: 17px; font-family: "Jua", "Noto Sans KR", sans-serif; font-weight: 400; }
+    #login button:active, #dialog button:active, #inventory button:active { transform: translateY(2px); box-shadow: 0 1px 0 #b85a00; }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #4f9ae6; outline-offset: 2px; }
+    #login-error { color: #d8283a; min-height: 1.2em; font-weight: 700; }
+    #chat-input { position: absolute; left: 12px; bottom: 70px; width: min(470px, calc(100vw - 24px)); }
     #dialog { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(460px, calc(100vw - 32px)); }
-    #dialog h3, #inventory h3 { margin: 0 0 8px; color: var(--accent); }
-    #dialog .shop button, #dialog .close, #inventory button { font: inherit; background: #3a2c1c; color: var(--ink);
-      border: 1px solid var(--edge); padding: 4px 8px; cursor: pointer; border-radius: 3px; }
-    #dialog .shop { display: grid; grid-template-columns: 1fr auto auto; gap: 6px 10px; align-items: center; margin: 10px 0; }
-    #inventory { right: 12px; top: 80px; width: 300px; max-height: calc(100vh - 100px); overflow: auto; }
-    #inv-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
-    .slot { height: 50px; border: 1px solid #5a4a30; background: #1a140e; position: relative; cursor: pointer;
+    #dialog h3, #inventory h3 { margin: 0 0 8px; font-family: "Jua", "Noto Sans KR", sans-serif; font-weight: 400; font-size: 22px; color: #d86a00; }
+    #dialog p { line-height: 1.6; }
+    #dialog .shop button, #dialog .close, #inventory button { padding: 5px 12px; }
+    #dialog .shop { display: grid; grid-template-columns: 1fr auto auto; gap: 8px 12px; align-items: center; margin: 10px 0;
+      padding: 10px; background: #fff3dc; border-radius: 10px; }
+    #inventory { right: 12px; top: 12px; width: 300px; max-height: calc(100vh - 90px); overflow: auto; }
+    #inv-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+    .slot { height: 50px; border: 2px solid #e2c89a; background: #fff3dc; border-radius: 8px; position: relative; cursor: pointer;
       display: flex; align-items: center; justify-content: center; }
-    .slot canvas { width: 32px; height: 32px; image-rendering: pixelated; }
-    .slot .qty { position: absolute; right: 2px; bottom: 0; font-size: 11px; }
-    .slot:hover { outline: 1px solid var(--accent); }
-    .offline-note { font-size: 13px; opacity: .7; margin: 0; }
+    .slot canvas { width: 40px; height: 40px; }
+    .slot .qty { position: absolute; right: 3px; bottom: 1px; font-size: 11px; font-weight: 700; color: #3a2a1a; text-shadow: 0 0 2px #fff; }
+    .slot:hover { border-color: var(--accent); }
+    .offline-note { font-size: 13px; opacity: .75; margin: 0; }
     .help { font-size: 12px; opacity: .75; margin-top: 8px; line-height: 1.5; }
   </style>
 </head>
@@ -45,6 +58,7 @@
     <div id="login" class="panel">
       <h1>풍운록</h1>
       <p>바람과 구름의 기록 — 고대 왕국의 사냥꾼이 되어 보시오</p>
+      <div class="card">
       <input id="name" maxlength="12" placeholder="이름 (한글·영문 2~12자)" autocomplete="off" />
       <select id="job">
         <option value="warrior">전사 — 강인한 체력과 근접 공격</option>
@@ -54,6 +68,7 @@
       </select>
       <button id="start">입장하기</button>
       <div id="login-error"></div>
+      </div>
     </div>
     <input id="chat-input" class="hidden" maxlength="200" placeholder="대화 입력 후 Enter (Esc 취소)" autocomplete="off" />
     <div id="dialog" class="panel hidden"></div>

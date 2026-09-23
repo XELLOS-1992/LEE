@@ -56,3 +56,47 @@ describe("AC-16 입력", () => {
     expect(keyToAction("KeyP")).toBeNull();
   });
 });
+
+describe("AC-15 풍경 개체 추출", () => {
+  it("AC-15 같은 지붕 타일 덩어리를 건물 한 채로 묶는다", async () => {
+    const { findBuildings } = await import("../client/scenery");
+    const { T } = await import("../shared/mapgen");
+    const G = T.GRASS, H = T.THATCH, W = T.GIWA;
+    const tiles = [
+      [G, H, H, G, G],
+      [G, H, H, G, W],
+      [G, G, G, G, W],
+    ];
+    expect(findBuildings(tiles)).toEqual([
+      { x: 1, y: 0, w: 2, h: 2, kind: "thatch" },
+      { x: 4, y: 1, w: 1, h: 2, kind: "giwa" },
+    ]);
+  });
+
+  it("AC-15 실제 마을 맵의 건물 수와 지붕 타일 수가 일치한다", async () => {
+    const { findBuildings } = await import("../client/scenery");
+    const { MAPS } = await import("../shared/maps");
+    const { T } = await import("../shared/mapgen");
+    const town = MAPS.town;
+    const bs = findBuildings(town.tiles);
+    const roofTiles = town.tiles.flat().filter((t) => t === T.THATCH || t === T.GIWA).length;
+    expect(bs.reduce((n, b) => n + b.w * b.h, 0)).toBe(roofTiles);
+    expect(bs.length).toBe(13);
+  });
+
+  it("AC-15 가장자리 마스크: 이웃이 같은 무리인 방향만 비트가 켜진다", async () => {
+    const { edgeMask, groundOf } = await import("../client/scenery");
+    const { T } = await import("../shared/mapgen");
+    const R = T.ROAD, G = T.GRASS;
+    const tiles = [
+      [G, R, G],
+      [R, R, G],
+      [G, G, G],
+    ];
+    const isRoad = (t: number) => t === R;
+    expect(edgeMask(tiles, 1, 1, isRoad)).toBe(1 | 8);
+    expect(edgeMask(tiles, 2, 2, isRoad)).toBe(2 | 4); // 맵 밖은 연결된 것으로 본다
+    expect(groundOf(T.TREE, false)).toBe(T.GRASS);
+    expect(groundOf(T.ROCK, true)).toBe(T.CAVE);
+  });
+});
