@@ -70,11 +70,24 @@ def _chrome_app(url: str) -> bool:
     return False
 
 
+def _watch_parent(pid: int) -> None:
+    """Quit if the app that started us is gone (crash, force quit, kill)."""
+    while True:
+        time.sleep(2)
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            os._exit(0)
+        except PermissionError:
+            pass
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(prog="meetnote")
     ap.add_argument("--port", type=int, default=int(os.environ.get("MEETNOTE_PORT", DEFAULT_PORT)))
     ap.add_argument("--browser", action="store_true", help="open in the default browser, not a Chromium app window")
     ap.add_argument("--no-window", action="store_true", help="run the server only")
+    ap.add_argument("--parent-pid", type=int, default=0, help="exit when this process (the Mac app) goes away")
     ap.add_argument("--download-models", action="store_true", help="download required models and exit")
     ap.add_argument("--with-whisper", action="store_true", help="with --download-models: also fetch the MLX Whisper model")
     args = ap.parse_args()
@@ -111,6 +124,9 @@ def main() -> None:
         if not _wait_up(port):
             print("서버를 시작하지 못했습니다. 로그:", config.LOG_PATH)
             sys.exit(1)
+
+    if args.parent_pid:
+        threading.Thread(target=_watch_parent, args=(args.parent_pid,), daemon=True).start()
 
     if args.no_window:
         print(f"MeetNote 실행 중: {url}")

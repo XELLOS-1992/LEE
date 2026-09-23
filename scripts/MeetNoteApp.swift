@@ -102,7 +102,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKUI
         }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: python)
-        p.arguments = ["-m", "meetnote", "--no-window", "--port", "\(kPort)"]
+        p.arguments = ["-m", "meetnote", "--no-window", "--port", "\(kPort)",
+                       "--parent-pid", "\(ProcessInfo.processInfo.processIdentifier)"]
         p.currentDirectoryURL = URL(fileURLWithPath: appRoot)
         var env = ProcessInfo.processInfo.environment
         env["PYTHONUNBUFFERED"] = "1"

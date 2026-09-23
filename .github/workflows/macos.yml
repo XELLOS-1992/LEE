@@ -18,7 +18,7 @@ jobs:
       - name: Unit, API and pipeline tests
         run: |
           ~/.local/bin/uv pip install --python .venv/bin/python pytest
-          .venv/bin/python -m pytest -q tests
+          MEETNOTE_MODELS="$HOME/Library/Application Support/MeetNote/models" .venv/bin/python -m pytest -q -rs tests
 
       - name: Native app was compiled
         run: |
@@ -39,6 +39,7 @@ jobs:
           cat state.json | head -c 400; echo
           grep -q '"version"' state.json
           kill $APP_PID || true
+          sleep 3
           sleep 3
           ! curl -sf http://127.0.0.1:8765/api/state  # engine stops with the app
 
