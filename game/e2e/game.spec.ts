@@ -16,6 +16,7 @@ interface GameHandle {
   renderStats: {
     frames: number; tiles: number; players: number; monsters: number; npcs: number; nameplates: number; hpBars: number;
     hud: boolean; chatBox: boolean; camera: { x: number; y: number }; meScreen: { x: number; y: number };
+    view: { w: number; h: number; zoom: number };
   };
   send: (m: unknown) => void;
 }
@@ -121,8 +122,8 @@ test("AC-15 캔버스에 맵·캐릭터·이름표·HP바·채팅창·상태창�
   expect(r.hud).toBe(true);
   expect(r.chatBox).toBe(true);
   // 플레이어는 화면 중앙 근처
-  expect(Math.abs(r.meScreen.x + 16 - 480)).toBeLessThanOrEqual(16);
-  expect(Math.abs(r.meScreen.y + 16 - 320)).toBeLessThanOrEqual(16);
+  expect(Math.abs(r.meScreen.x + 16 - r.view.w / 2)).toBeLessThanOrEqual(16);
+  expect(Math.abs(r.meScreen.y + 16 - r.view.h / 2)).toBeLessThanOrEqual(16);
   const cam0 = r.camera;
   await step(page, "ArrowRight");
   await page.waitForTimeout(300);
@@ -130,6 +131,28 @@ test("AC-15 캔버스에 맵·캐릭터·이름표·HP바·채팅창·상태창�
   expect(cam1.x - cam0.x).toBe(32);
   expect(cam1.y).toBe(cam0.y);
   await page.screenshot({ path: "test-results/screens/ac15-town.png" });
+});
+
+test("AC-15 게임 화면은 브라우저 창 전체를 채우고, 창을 키우면 함께 커진다", async ({ page }) => {
+  await enter(page, `큰창${uniq()}`);
+  const size = () =>
+    page.evaluate(() => {
+      const r = document.getElementById("game")!.getBoundingClientRect();
+      return { w: r.width, h: r.height, vw: innerWidth, vh: innerHeight, view: window.__game.renderStats.view };
+    });
+  const small = await size();
+  expect(small.w).toBe(small.vw);
+  expect(small.h).toBe(small.vh);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.waitForTimeout(200);
+  const big = await size();
+  expect([big.w, big.h]).toEqual([1600, 1000]);
+  expect(big.view.zoom).toBeGreaterThan(small.view.zoom);
+  // 확대 후에도 가로 26칸·세로 16칸 이상이 보인다
+  expect(big.view.w).toBeGreaterThanOrEqual(26 * 32);
+  expect(big.view.h).toBeGreaterThanOrEqual(16 * 32);
+  await page.waitForFunction(() => window.__game.renderStats.frames > 3);
+  await page.screenshot({ path: "test-results/screens/ac15-large.png" });
 });
 
 test("AC-16 키보드 입력: 방향키·Space·숫자키·Enter·I·Esc", async ({ page }) => {

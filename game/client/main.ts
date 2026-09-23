@@ -11,9 +11,28 @@ import { TILE, itemSprite, monsterSprite, npcSprite, playerSprite, renderMapCanv
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
-ctx.imageSmoothingEnabled = false;
-const VIEW_W = canvas.width;
-const VIEW_H = canvas.height;
+// 화면 크기: 캔버스는 브라우저 창 전체를 채우고, 보이는 범위가 대략 가로 26칸·세로 16칸이 되도록 확대한다.
+const MIN_TILES_W = 26;
+const MIN_TILES_H = 16;
+let VIEW_W = canvas.width; // 게임 좌표계 기준 화면 크기(확대 전)
+let VIEW_H = canvas.height;
+let ZOOM = 1;
+
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = window.innerWidth, cssH = window.innerHeight;
+  // 0.25 단위로 맞춰 픽셀아트가 덜 일그러지게 한다
+  ZOOM = Math.max(1, Math.floor(Math.min(cssW / (MIN_TILES_W * TILE), cssH / (MIN_TILES_H * TILE)) * 4) / 4);
+  canvas.style.width = `${cssW}px`;
+  canvas.style.height = `${cssH}px`;
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  VIEW_W = Math.round(cssW / ZOOM);
+  VIEW_H = Math.round(cssH / ZOOM);
+  ctx.setTransform(ZOOM * dpr, 0, 0, ZOOM * dpr, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  renderStats.view = { w: VIEW_W, h: VIEW_H, zoom: ZOOM };
+}
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 interface ChatLine { from: string; text: string; kind: "chat" | "system" | "error" }
@@ -35,7 +54,7 @@ const state = {
 
 const renderStats = {
   frames: 0, tiles: 0, players: 0, monsters: 0, npcs: 0, items: 0, nameplates: 0, hpBars: 0,
-  hud: false, chatBox: false, camera: { x: 0, y: 0 }, meScreen: { x: 0, y: 0 },
+  hud: false, chatBox: false, camera: { x: 0, y: 0 }, meScreen: { x: 0, y: 0 }, view: { w: 0, h: 0, zoom: 1 },
 };
 
 const visuals = new Map<string, Visual>();
@@ -619,6 +638,8 @@ function drawTitleBackground(now: number) {
   }
 }
 
+resize();
+window.addEventListener("resize", resize);
 requestAnimationFrame(frame);
 
 // 테스트·디버깅용 노출
