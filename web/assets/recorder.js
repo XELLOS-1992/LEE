@@ -18,7 +18,7 @@ export async function startRecording(opts = {}) {
     stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         deviceId: mic ? { exact: mic } : undefined, channelCount: 1,
-        noiseSuppression: ls('mn.ns', '1'), autoGainControl: ls('mn.agc', '1'), echoCancellation: ls('mn.ec', '0'),
+        noiseSuppression: ls('mn.ns', '0'), autoGainControl: ls('mn.agc', '0'), echoCancellation: ls('mn.ec', '0'),
       },
     });
   } catch (e) {

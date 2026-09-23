@@ -9,7 +9,7 @@ import numpy as np
 SR = 16000
 
 # Formats the app's web view can play directly (WebKit and Chromium both).
-PLAYABLE = {".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".aac": "audio/aac", ".wav": "audio/wav",
+PLAYABLE = {".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".aac": "audio/aac", ".wav": "audio/wav", ".flac": "audio/flac",
             ".mp4": "video/mp4", ".mov": "video/quicktime"}
 
 

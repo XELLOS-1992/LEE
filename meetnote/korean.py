@@ -86,14 +86,16 @@ def punctuate(text: str) -> str:
             carry = ""
         else:
             carry = chunk
-    if carry:
-        sents.append(carry)
     out = []
     for s in sents:
         if not re.search(r"[.?!…。？！,]$", s):
             s += "?" if QUESTION_END.search(s) else "."
         s = INTERJ.sub(lambda m: m.group(1) + ", ", s)
         out.append(s)
+    if carry:
+        # An utterance cut mid-sentence ('…중 하나는') gets no full stop; the
+        # next utterance usually continues it.
+        out.append(INTERJ.sub(lambda m: m.group(1) + ", ", carry))
     return " ".join(out)
 
 

@@ -348,13 +348,13 @@ def finalize_recording(nid: str) -> None:
         db.update_note(nid, status="error", stage="", error="녹음된 소리가 없습니다.")
         return
     samples = audio.pcm16_to_float(pcm.read_bytes())
-    out = config.AUDIO_DIR / f"{nid}.m4a"
-    audio.encode_m4a(samples, out)
-    if config.load_settings().get("keep_recording_wav"):
-        import soundfile as sf
-        sf.write(config.AUDIO_DIR / f"{nid}.wav", samples, audio.SR)
+    # Lossless FLAC: recognition reads exactly what the mic captured (a lossy
+    # codec would throw away detail the recogniser uses). ~55MB per hour.
+    import soundfile as sf
+    out = config.AUDIO_DIR / f"{nid}.flac"
+    sf.write(out, samples, audio.SR, format="FLAC", subtype="PCM_16")
     pcm.unlink(missing_ok=True)
-    db.update_note(nid, audio_file=out.name, audio_mime="audio/mp4", duration=len(samples) / audio.SR,
+    db.update_note(nid, audio_file=out.name, audio_mime="audio/flac", duration=len(samples) / audio.SR,
                    peaks=json.dumps(audio.peaks(samples)))
     pipeline.enqueue(nid)
 

@@ -36,7 +36,7 @@ def _segments_from_whisper(raw_segments, offset: float, win_end: float) -> list[
     return out
 
 
-def _prompt(hint: str, language: str) -> str | None:
+def _prompt(hint: str, language: str, previous: str = "") -> str | None:
     # A short in-language prompt nudges Whisper toward punctuated, formal
     # transcripts; user keywords help it spell names and jargon.
     base = {"ko": "다음은 회의 녹음입니다.", "en": "The following is a meeting recording.",
@@ -44,12 +44,19 @@ def _prompt(hint: str, language: str) -> str | None:
     hint = (hint or "").strip()
     if hint:
         base = f"{base} 주요 용어: {hint}." if language == "ko" else f"{base} Terms: {hint}."
+    # The end of the previous window keeps names, terms and style consistent
+    # across the 30-second chunks Whisper works in.
+    if previous:
+        base = f"{base} {previous[-160:]}".strip()
     return base or None
 
 
 class WhisperMLXEngine(Engine):
     name = "whisper-mlx"
-    label = "Whisper large-v3-turbo (MLX · Apple GPU)"
+
+    @property
+    def label(self):
+        return f"Whisper {config.load_settings()['whisper_model']} (MLX · Apple GPU)"
 
     def transcribe(self, audio, language="ko", hint="", progress=None):
         import mlx_whisper
@@ -58,6 +65,7 @@ class WhisperMLXEngine(Engine):
         total = len(audio) / SR
         wins = windows(vad_regions(audio, max_speech=28.0), total, max_len=28.0, max_gap=1.5)
         out = []
+        prev = ""
         for i, (s, e) in enumerate(wins):
             chunk = audio[int(s * SR):int(e * SR)]
             with _lock:
@@ -65,9 +73,14 @@ class WhisperMLXEngine(Engine):
                     chunk, path_or_hf_repo=repo,
                     language=None if language == "auto" else language,
                     word_timestamps=True, condition_on_previous_text=False,
-                    initial_prompt=_prompt(hint, language), verbose=None,
+                    initial_prompt=_prompt(hint, language, prev), verbose=None,
                 )
-            out.extend(_segments_from_whisper(res.get("segments", []), s, e))
+            segs = _segments_from_whisper(res.get("segments", []), s, e)
+            out.extend(segs)
+            prev = " ".join(x["text"] for x in segs) if segs else ""
+            # After a long pause the topic may have changed; start fresh.
+            if i + 1 < len(wins) and wins[i + 1][0] - e > 8.0:
+                prev = ""
             if progress:
                 progress((i + 1) / max(1, len(wins)))
         return out
@@ -93,14 +106,17 @@ class FasterWhisperEngine(Engine):
         total = len(audio) / SR
         wins = windows(vad_regions(audio, max_speech=28.0), total, max_len=28.0, max_gap=1.5)
         out = []
+        prev = ""
         for i, (s, e) in enumerate(wins):
             chunk = audio[int(s * SR):int(e * SR)]
             segs, _info = model.transcribe(
                 chunk, language=None if language == "auto" else language, beam_size=5,
                 word_timestamps=True, condition_on_previous_text=False,
-                initial_prompt=_prompt(hint, language), vad_filter=False,
+                initial_prompt=_prompt(hint, language, prev), vad_filter=False,
             )
-            out.extend(_segments_from_whisper(list(segs), s, e))
+            got = _segments_from_whisper(list(segs), s, e)
+            out.extend(got)
+            prev = " ".join(x["text"] for x in got) if got else ""
             if progress:
                 progress((i + 1) / max(1, len(wins)))
         return out

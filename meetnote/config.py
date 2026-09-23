@@ -56,7 +56,6 @@ DEFAULTS: dict = {
     # app
     "theme": "system",               # system | light | dark
     "skip_seconds": 5,
-    "keep_recording_wav": False,
 }
 
 _lock = threading.Lock()

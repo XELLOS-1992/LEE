@@ -224,10 +224,9 @@ export async function openSettings(tab = 'asr') {
       const ls = (k, def) => (localStorage.getItem(k) ?? def) === '1';
       p.push(row('마이크', '녹음에 사용할 입력 장치', micSel));
       p.push(row('실시간 자막', '녹음하는 동안 말한 내용을 바로 보여줍니다 (SenseVoice)', sw(s.live_transcription, (v) => save({ live_transcription: v }))));
-      p.push(row('잡음 억제', '에어컨·키보드 소리를 줄입니다', sw(ls('mn.ns', '1'), (v) => localStorage.setItem('mn.ns', v ? '1' : '0'))));
-      p.push(row('자동 음량 조절', '멀리 있는 사람 목소리를 키웁니다', sw(ls('mn.agc', '1'), (v) => localStorage.setItem('mn.agc', v ? '1' : '0'))));
+      p.push(row('잡음 억제', '끄는 것을 권장 — 화상통화용 처리라 받아쓰기 정확도를 떨어뜨릴 수 있습니다', sw(ls('mn.ns', '0'), (v) => localStorage.setItem('mn.ns', v ? '1' : '0'))));
+      p.push(row('자동 음량 조절', '마이크에서 멀리 앉은 사람이 많을 때만 켜세요', sw(ls('mn.agc', '0'), (v) => localStorage.setItem('mn.agc', v ? '1' : '0'))));
       p.push(row('에코 제거', '스피커로 화상회의를 들으며 녹음할 때 켜세요', sw(ls('mn.ec', '0'), (v) => localStorage.setItem('mn.ec', v ? '1' : '0'))));
-      p.push(row('원본 WAV 보관', '녹음을 압축(m4a)과 별도로 무손실 WAV로도 저장', sw(s.keep_recording_wav, (v) => save({ keep_recording_wav: v }))));
     } else if (tab === 'models') {
       p.push(h('div', { class: 'hint', style: { color: 'var(--muted)', fontSize: '12.5px' } }, `모든 모델은 이 Mac에서만 실행됩니다. 저장 위치: ${ms.dir}`));
       p.push(...ms.models.map(modelRow));
