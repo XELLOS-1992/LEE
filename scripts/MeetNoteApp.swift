@@ -6,13 +6,14 @@
 // and standard Mac menus/shortcuts. Built by scripts/build_app.sh with swiftc.
 
 import Cocoa
+import UserNotifications
 import WebKit
 
 let kPort = 8765
 let kURL = URL(string: "http://127.0.0.1:\(kPort)/")!
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKUIDelegate, WKNavigationDelegate,
-    WKDownloadDelegate, WKScriptMessageHandler
+    WKDownloadDelegate, WKScriptMessageHandler, UNUserNotificationCenterDelegate
 {
     var window: NSWindow!
     var webView: WKWebView!
@@ -25,6 +26,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKUI
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
         buildWindow()
+        UNUserNotificationCenter.current().delegate = self
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         startServerIfNeeded()
         waitForServer(attempt: 0)
     }
@@ -328,6 +331,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKUI
         guard let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
         if type == "print" { runPrint() }
         if type == "quit" { NSApp.terminate(nil) }
+        if type == "notify" {
+            let content = UNMutableNotificationContent()
+            content.title = (body["title"] as? String) ?? "회의노트"
+            content.body = (body["body"] as? String) ?? ""
+            content.sound = .default
+            let req = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+            UNUserNotificationCenter.current().add(req, withCompletionHandler: nil)
+        }
     }
 
     // MARK: WKUIDelegate
@@ -447,6 +458,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKUI
         downloads.removeValue(forKey: ObjectIdentifier(download))
         let alert = NSAlert(error: error)
         alert.runModal()
+    }
+
+    // Clicking a notification brings the window forward.
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        DispatchQueue.main.async {
+            NSApp.activate(ignoringOtherApps: true)
+            self.window.makeKeyAndOrderFront(nil)
+        }
+        completionHandler()
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {

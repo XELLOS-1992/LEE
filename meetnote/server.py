@@ -138,6 +138,15 @@ def list_notes(view: str = "all", folder: str | None = None, q: str = "", sort: 
     return db.list_notes(view=view, folder=folder, q=q.strip(), sort=sort)
 
 
+@app.get("/api/jobs")
+def jobs():
+    rows = db.conn().execute(
+        "SELECT id, title, status, stage, progress, summary_status FROM notes "
+        "WHERE deleted_at IS NULL AND (status IN ('queued','processing') OR summary_status='running')"
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
 @app.get("/api/notes/{nid}")
 def get_note(nid: str):
     return _full(nid)

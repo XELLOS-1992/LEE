@@ -355,6 +355,42 @@ function setupKeys() {
   });
 }
 
+// ------------------------------------------------------------------ background jobs
+// Tell the user when a conversion or summary finishes, wherever they are in the app.
+const active = new Map();
+async function watchJobs() {
+  try {
+    const jobs = await api('/api/jobs');
+    const now = new Set(jobs.map((j) => j.id));
+    for (const j of jobs) active.set(j.id, j);
+    for (const [id, j] of active) {
+      if (now.has(id)) continue;
+      active.delete(id);
+      const st = await api(`/api/notes/${id}/status`).catch(() => null);
+      if (!st) continue;
+      if (st.status === 'done') {
+        const onNote = S.route?.name === 'note' && S.route.id === id;
+        if (!onNote) toast(`'${st.title}' 회의록이 준비됐습니다`, { action: { label: '열기', fn: () => go(`#/note/${id}`) }, ms: 8000 });
+        notifyNative('회의록이 준비됐습니다', st.title);
+      } else if (st.status === 'error') {
+        toast(`'${st.title}' 변환 실패: ${st.error}`, { error: true, ms: 8000 });
+      }
+      refreshCounts();
+    }
+  } catch { /* server restarting */ }
+  setTimeout(watchJobs, active.size ? 2000 : 4000);
+}
+
+function notifyNative(title, body) {
+  if (document.hasFocus()) return;
+  if (window.__meetnoteNative) window.webkit.messageHandlers.meetnote.postMessage({ type: 'notify', title, body });
+  else if ('Notification' in window && Notification.permission === 'granted') new Notification(title, { body, icon: '/assets/icon.png' });
+}
+
+export function askNotificationPermission() {
+  if (!window.__meetnoteNative && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+}
+
 async function boot() {
   setupDrop();
   setupKeys();
@@ -368,6 +404,7 @@ async function boot() {
   const media = window.matchMedia('(prefers-color-scheme: dark)');
   media.addEventListener?.('change', () => applyTheme(S.state?.settings.theme));
   await route();
+  watchJobs();
 }
 
 boot();

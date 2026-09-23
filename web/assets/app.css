@@ -272,6 +272,15 @@ button.chip:hover { background: var(--accent-weak); color: var(--accent-text); }
 .part .avatar { width: 28px; height: 28px; font-size: 11.5px; }
 .bar { height: 6px; background: var(--line-2); border-radius: 6px; overflow: hidden; margin: 5px 0 4px; }
 .bar > div { height: 100%; border-radius: 6px; }
+.editable { outline: 1px dashed var(--accent); outline-offset: 2px; border-radius: 4px; cursor: text; }
+.editable:focus { outline-style: solid; background: var(--panel); }
+.edit-bar { position: sticky; top: -16px; z-index: 2; display: flex; gap: 8px; align-items: center; padding: 10px 12px; margin: -4px 0 12px; border-radius: 12px; background: var(--accent-weak); color: var(--accent-text); font-weight: 600; font-size: 13px; }
+.x-btn { border: 0; background: none; color: var(--muted); padding: 2px; margin-left: 6px; border-radius: 5px; vertical-align: middle; display: inline-flex; }
+.x-btn:hover { color: var(--danger); background: var(--danger-weak); }
+.add-btn { border: 1px dashed var(--line); background: none; color: var(--muted); border-radius: 8px; padding: 4px 10px; margin-top: 8px; display: inline-flex; gap: 4px; align-items: center; font-size: 12.5px; }
+.add-btn:hover { color: var(--accent-text); border-color: var(--accent); }
+.inp.mini { height: 26px; font-size: 12px; width: 120px; padding: 0 8px; }
+input[type=range], input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
 .sum-foot { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; margin-top: 6px; padding: 0 2px; }
 .minutes { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 26px 26px 30px; }
 .minutes h1 { font-size: 20px; margin: 0 0 14px; letter-spacing: -.4px; }

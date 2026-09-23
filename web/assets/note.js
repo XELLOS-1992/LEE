@@ -11,7 +11,7 @@ export async function renderNote(main, id, opts = {}) {
     return null;
   }
   const V = {
-    note, tab: localStorage.getItem('mn.tab') || 'summary', audio: null, follow: true, activeSeg: -1, activeWord: null,
+    note, tab: localStorage.getItem('mn.tab') || 'summary', editSummary: false, audio: null, follow: true, activeSeg: -1, activeWord: null,
     search: '', matches: [], matchIdx: -1, speakerFilter: null, pollTimer: null, raf: 0, destroyed: false, segEls: new Map(),
   };
   const speakers = () => Object.fromEntries(V.note.speakers.map((s) => [s.idx, s.name]));
@@ -236,8 +236,18 @@ export async function renderNote(main, id, opts = {}) {
       h('h3', null, n.status === 'queued' ? '변환 대기 중' : n.stage || '변환 중'),
       h('div', { style: { color: 'var(--muted)', fontSize: '13px' } }, n.status === 'queued' ? '앞의 작업이 끝나면 시작합니다' : '음성을 텍스트로 바꾸고 참석자를 구분하고 있습니다'),
       h('div', { class: `progress${n.status === 'queued' ? ' indet' : ''}` }, h('div', { style: { width: `${pct}%` } })),
-      h('div', { class: 'pct' }, n.status === 'queued' ? '' : `${pct}%`),
+      h('div', { class: 'pct' }, n.status === 'queued' ? '' : `${pct}%${eta()}`),
       h('div', { style: { color: 'var(--muted)', fontSize: '12px', marginTop: '10px' } }, '다른 작업을 해도 괜찮습니다. 끝나면 자동으로 표시됩니다.'));
+  }
+
+  function eta() {
+    const hs = V.progHist || [];
+    if (hs.length < 3) return '';
+    const a = hs[Math.max(0, hs.length - 15)], b = hs[hs.length - 1];
+    const rate = (b.p - a.p) / ((b.t - a.t) / 1000);
+    if (!(rate > 0) || b.t - a.t < 3000) return '';
+    const left = (1 - b.p) / rate;
+    return left < 60 ? ' · 1분 이내 남음' : ` · 약 ${Math.round(left / 60)}분 남음`;
   }
 
   async function toggleHL(seg, el, btn) {
@@ -374,32 +384,67 @@ export async function renderNote(main, id, opts = {}) {
     return t;
   }
 
+  // Editable text: plain in view mode, contenteditable in edit mode.
+  function ed(tag, obj, key, attrs = {}) {
+    const el = h(tag, attrs, obj[key]);
+    if (V.editSummary) {
+      el.contentEditable = 'true';
+      el.classList.add('editable');
+      el.addEventListener('blur', () => { obj[key] = el.innerText.trim(); });
+      el.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); el.blur(); } });
+    }
+    return el;
+  }
+
+  function listSec(sm, key, title, ic, ordered = false) {
+    const arr = sm[key] || (sm[key] = []);
+    if (!arr.length && !V.editSummary) return null;
+    return h('div', { class: 'sec' }, h('h4', null, icon(ic, 'sm'), title),
+      h(ordered ? 'ol' : 'ul', null, arr.map((_, i) => h('li', null, ed('span', arr, i),
+        V.editSummary ? h('button', { class: 'x-btn', title: '삭제', onclick: () => { arr.splice(i, 1); renderSide(); } }, icon('x', 'sm')) : null))),
+      V.editSummary ? h('button', { class: 'add-btn', onclick: () => { arr.push('새 항목'); renderSide(); } }, icon('plus', 'sm'), '추가') : null);
+  }
+
   function renderSummary() {
     const sm = V.note.summary;
     if (!sm || V.note.summary_status === 'running' || V.note.status !== 'done') return [summaryWaiting()];
     const out = [];
-    if (V.note.summary_error) out.push(h('div', { class: 'err', style: { marginBottom: '12px' } }, V.note.summary_error));
-    if (sm.one_line) out.push(h('div', { class: 'sec oneline-sec' }, h('h4', null, icon('sparkle', 'sm'), '한 줄 요약'), h('div', { class: 'oneline' }, sm.one_line)));
-    if (sm.overview) out.push(h('div', { class: 'sec' }, h('h4', null, icon('notes', 'sm'), '요약'), h('p', null, sm.overview)));
+    const E = V.editSummary;
+    if (V.note.summary_error && !E) out.push(h('div', { class: 'err', style: { marginBottom: '12px' } }, V.note.summary_error));
+    if (E) out.push(h('div', { class: 'edit-bar' }, icon('edit', 'sm'), '요약 편집 중 — 글자를 눌러 고치세요',
+      h('span', { class: 'spacer' }),
+      h('button', { class: 'btn sm', onclick: async () => { V.editSummary = false; V.note = await api(`/api/notes/${id}`); renderSide(); } }, '취소'),
+      h('button', { class: 'btn sm primary', onclick: async () => { document.activeElement?.blur(); await saveSummary(); V.editSummary = false; toast('요약을 저장했습니다'); renderSide(); } }, '저장')));
+    if (sm.one_line || E) out.push(h('div', { class: 'sec oneline-sec' }, h('h4', null, icon('sparkle', 'sm'), '한 줄 요약'), ed('div', sm, 'one_line', { class: 'oneline' })));
+    if (sm.overview || E) out.push(h('div', { class: 'sec' }, h('h4', null, icon('notes', 'sm'), '요약'), ed('p', sm, 'overview')));
     if (sm.topics?.length) {
       out.push(h('div', { class: 'sec' }, h('h4', null, icon('list', 'sm'), '주요 주제'),
-        sm.topics.map((t, i) => h('div', { class: 'topic' }, h('div', { class: 'topic-h' }, `${i + 1}. ${t.title}`, tlink(t.start)),
-          h('ul', null, (t.points || []).map((p) => h('li', null, p)))))));
+        sm.topics.map((t, i) => h('div', { class: 'topic' },
+          h('div', { class: 'topic-h' }, `${i + 1}.`, ed('span', t, 'title'), tlink(t.start),
+            E ? h('button', { class: 'x-btn', title: '주제 삭제', onclick: () => { sm.topics.splice(i, 1); renderSide(); } }, icon('x', 'sm')) : null),
+          h('ul', null, (t.points || []).map((_, j) => h('li', null, ed('span', t.points, j),
+            E ? h('button', { class: 'x-btn', onclick: () => { t.points.splice(j, 1); renderSide(); } }, icon('x', 'sm')) : null))),
+          E ? h('button', { class: 'add-btn', onclick: () => { (t.points ||= []).push('새 내용'); renderSide(); } }, icon('plus', 'sm'), '내용 추가') : null))));
     }
-    if (sm.decisions?.length) out.push(h('div', { class: 'sec' }, h('h4', null, icon('check', 'sm'), '결정 사항'), h('ul', null, sm.decisions.map((d) => h('li', null, d)))));
-    if (sm.action_items?.length) {
-      out.push(h('div', { class: 'sec' }, h('h4', null, icon('flag', 'sm'), `할 일 ${sm.action_items.filter((a) => a.done).length}/${sm.action_items.length}`),
-        sm.action_items.map((a) => {
-          const row = h('label', { class: `todo${a.done ? ' done' : ''}` },
-            h('input', { type: 'checkbox', checked: a.done, onchange: async (e) => { a.done = e.target.checked; row.classList.toggle('done', a.done); await saveSummary(); renderSide(); } }),
-            h('div', { style: { flex: 1 } }, h('div', { class: 'todo-t' }, a.task),
-              h('div', { class: 'todo-meta' }, a.owner ? h('span', { class: 'chip' }, icon('user', 'sm'), a.owner) : null, a.due ? h('span', { class: 'chip warn' }, icon('clock', 'sm'), a.due) : null, tlink(a.start))));
+    out.push(listSec(sm, 'decisions', '결정 사항', 'check'));
+    const acts = sm.action_items || (sm.action_items = []);
+    if (acts.length || E) {
+      out.push(h('div', { class: 'sec' }, h('h4', null, icon('flag', 'sm'), `할 일 ${acts.filter((a) => a.done).length}/${acts.length}`),
+        acts.map((a, i) => {
+          const row = h(E ? 'div' : 'label', { class: `todo${a.done ? ' done' : ''}` },
+            h('input', { type: 'checkbox', checked: a.done, onchange: async (e) => { a.done = e.target.checked; row.classList.toggle('done', a.done); if (!E) { await saveSummary(); renderSide(); } } }),
+            h('div', { style: { flex: 1 } }, ed('div', a, 'task', { class: 'todo-t' }),
+              E ? h('div', { class: 'todo-meta' }, h('input', { class: 'inp mini', placeholder: '담당', value: a.owner || '', oninput: (e) => { a.owner = e.target.value; } }),
+                h('input', { class: 'inp mini', placeholder: '기한', value: a.due || '', oninput: (e) => { a.due = e.target.value; } }))
+                : h('div', { class: 'todo-meta' }, a.owner ? h('span', { class: 'chip' }, icon('user', 'sm'), a.owner) : null, a.due ? h('span', { class: 'chip warn' }, icon('clock', 'sm'), a.due) : null, tlink(a.start))),
+            E ? h('button', { class: 'x-btn', onclick: () => { acts.splice(i, 1); renderSide(); } }, icon('x', 'sm')) : null);
           return row;
-        })));
+        }),
+        E ? h('button', { class: 'add-btn', onclick: () => { acts.push({ task: '새 할 일', owner: '', due: '', time: '', start: null, done: false }); renderSide(); } }, icon('plus', 'sm'), '할 일 추가') : null));
     }
-    if (sm.open_issues?.length) out.push(h('div', { class: 'sec' }, h('h4', null, icon('alert', 'sm'), '미결 · 확인 필요'), h('ul', null, sm.open_issues.map((d) => h('li', null, d)))));
-    if (sm.key_points?.length) out.push(h('div', { class: 'sec' }, h('h4', null, icon('target', 'sm'), '핵심 내용'), h('ul', null, sm.key_points.map((d) => h('li', null, d)))));
-    if (sm.keywords?.length) {
+    out.push(listSec(sm, 'open_issues', '미결 · 확인 필요', 'alert'));
+    out.push(listSec(sm, 'key_points', '핵심 내용', 'target'));
+    if (sm.keywords?.length && !E) {
       out.push(h('div', { class: 'sec' }, h('h4', null, icon('search', 'sm'), '키워드'),
         h('div', { class: 'kw-wrap' }, sm.keywords.map((k) => h('button', { class: 'chip', title: '대화에서 찾기', onclick: () => { searchInput.value = k; V.search = k; V.matchIdx = -1; renderTranscript(); gotoMatch(0); } }, `#${k}`)))));
     }
@@ -407,7 +452,7 @@ export async function renderNote(main, id, opts = {}) {
     const total = Object.values(tt).reduce((a, b) => a + b, 0) || 1;
     const partSum = Object.fromEntries((sm.participants || []).map((p) => [p.name, p.summary]));
     const order = Object.keys(tt).map(Number).sort((a, b) => tt[b] - tt[a]);
-    if (order.length) {
+    if (order.length && !E) {
       out.push(h('div', { class: 'sec' }, h('h4', null, icon('users', 'sm'), '참석자'),
         order.map((i) => h('div', { class: 'part' }, h('div', { class: 'avatar', style: { background: speakerColor(i) }, onclick: () => renameSpeaker(i), title: '이름 바꾸기' }, initials(nameOf(i), i)),
           h('div', { style: { flex: 1, minWidth: 0 } },
@@ -415,10 +460,13 @@ export async function renderNote(main, id, opts = {}) {
             h('div', { class: 'bar' }, h('div', { style: { width: `${(100 * tt[i]) / total}%`, background: speakerColor(i) } })),
             partSum[nameOf(i)] ? h('div', { style: { fontSize: '12.5px', color: 'var(--text-2)' } }, partSum[nameOf(i)]) : null)))));
     }
-    out.push(h('div', { class: 'sum-foot' }, icon('sparkle', 'sm'), V.note.summary_provider || '', h('span', { class: 'spacer' }),
-      h('button', { class: 'btn ghost sm', onclick: () => copyText(summaryText()) }, icon('copy', 'sm'), '복사'),
-      h('button', { class: 'btn ghost sm', onclick: resummarize }, icon('refresh', 'sm'), '다시 요약')));
-    return out;
+    if (!E) {
+      out.push(h('div', { class: 'sum-foot' }, icon('sparkle', 'sm'), V.note.summary_provider || '', h('span', { class: 'spacer' }),
+        h('button', { class: 'btn ghost sm', onclick: () => { V.editSummary = true; renderSide(); } }, icon('edit', 'sm'), '편집'),
+        h('button', { class: 'btn ghost sm', onclick: () => copyText(summaryText()) }, icon('copy', 'sm'), '복사'),
+        h('button', { class: 'btn ghost sm', onclick: resummarize }, icon('refresh', 'sm'), '다시 요약')));
+    }
+    return out.filter(Boolean);
   }
 
   function summaryText() {
@@ -603,11 +651,16 @@ export async function renderNote(main, id, opts = {}) {
   const speedSel = h('select', { class: 'speed', title: '재생 속도', onchange: (e) => { if (V.audio) V.audio.playbackRate = Number(e.target.value); localStorage.setItem('mn.rate', e.target.value); } },
     [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5].map((r) => h('option', { value: r, selected: Number(localStorage.getItem('mn.rate') || 1) === r ? '' : null }, `${r}x`)));
   const skip = () => Number(S.state.settings.skip_seconds || 5);
+  V.skipSilence = localStorage.getItem('mn.skipSilence') === '1';
+  const silenceBtn = h('button', {
+    class: `btn ghost sm${V.skipSilence ? ' active' : ''}`, title: '말소리가 없는 구간을 건너뛰고 재생합니다',
+    onclick: () => { V.skipSilence = !V.skipSilence; localStorage.setItem('mn.skipSilence', V.skipSilence ? '1' : '0'); silenceBtn.classList.toggle('active', V.skipSilence); toast(V.skipSilence ? '무음 구간을 건너뜁니다' : '무음 건너뛰기를 껐습니다'); },
+  }, '무음 건너뛰기');
   playerEl.append(
     h('button', { class: 'skip', title: `${skip()}초 뒤로 (←)`, onclick: () => seek((V.audio?.currentTime || 0) - skip()) }, icon('rew'), h('small', null, skip())),
     playBtn,
     h('button', { class: 'skip', title: `${skip()}초 앞으로 (→)`, onclick: () => seek((V.audio?.currentTime || 0) + skip()) }, icon('fwd'), h('small', null, skip())),
-    timeEl, waveEl, speedSel,
+    timeEl, waveEl, silenceBtn, speedSel,
     h('button', { class: 'btn ghost icon', title: '현재 위치 북마크 (B)', onclick: () => addBookmark(V.audio?.currentTime || 0) }, icon('bookmark')));
 
   function setupAudio() {
@@ -663,6 +716,12 @@ export async function renderNote(main, id, opts = {}) {
 
   function syncPlayhead(force) {
     const t = V.audio ? V.audio.currentTime : 0;
+    if (V.skipSilence && V.audio && !V.audio.paused && V.note.segments.length) {
+      const k = findSeg(t);
+      const cur = V.note.segments[k], next = V.note.segments[k + 1];
+      const gapEnd = k < 0 ? V.note.segments[0].start : (next && t > cur.end + 0.25 ? next.start : null);
+      if (gapEnd !== null && gapEnd - t > 1.0) { V.audio.currentTime = gapEnd - 0.2; return; }
+    }
     timeEl.textContent = `${fmtTime(t)} / ${fmtTime(duration())}`;
     drawWave();
     const i = findSeg(t);
@@ -818,6 +877,7 @@ export async function renderNote(main, id, opts = {}) {
       const wasDone = V.note.status === 'done';
       const sumChanged = st.summary_status !== V.note.summary_status;
       Object.assign(V.note, { status: st.status, stage: st.stage, progress: st.progress, error: st.error });
+      if (st.status === 'processing') (V.progHist ||= []).push({ t: Date.now(), p: st.progress });
       if (st.status === 'done' && (!wasDone || sumChanged || st.summary_status !== 'running')) {
         await reload();
         titleInput.value = V.note.title;

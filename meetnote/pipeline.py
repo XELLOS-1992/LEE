@@ -99,11 +99,43 @@ def process(nid: str) -> None:
         models.download("whisper-mlx", block=True)
     db.update_note(nid, touch=False, engine=engine.label)
 
-    _stage(nid, "asr")
+    # Speaker separation runs alongside recognition (on a Mac the recogniser
+    # uses the GPU while diarization uses the CPU).
+    prog = {"asr": 0.0, "diar": 0.0}
+    want_diar = settings["diarization"] and note["num_speakers"] != 1
+    label = "음성 인식 · 화자 구분 중" if want_diar else STAGES["asr"][0]
+
+    def report():
+        a, b = STAGES["asr"][1], STAGES["diarize"][2]
+        frac = 0.6 * prog["asr"] + 0.4 * prog["diar"] if want_diar else prog["asr"]
+        db.update_note(nid, touch=False, status="processing", stage=label, progress=round(a + (b - a) * frac, 4))
+
+    def on_asr(f):
+        prog["asr"] = f
+        report()
+
+    def on_diar(f):
+        prog["diar"] = f
+        report()
+
+    diar_result: dict = {}
+
+    def run_diar():
+        try:
+            diar_result["turns"] = diarize.diarize(
+                samples, num_speakers=note["num_speakers"] or 0,
+                threshold=float(settings["diarization_threshold"]), progress=on_diar)
+        except Exception as e:  # a transcript without speakers beats no transcript
+            log.error("diarization failed: %s", traceback.format_exc())
+            diar_result["error"] = e
+
+    diar_thread = threading.Thread(target=run_diar, name="diarize", daemon=True) if want_diar else None
+    if diar_thread:
+        diar_thread.start()
+    report()
     lang = note["language"] or settings["language"]
     try:
-        pieces = engine.transcribe(samples, language=lang, hint=note["hint"],
-                                   progress=lambda f: _stage(nid, "asr", f))
+        pieces = engine.transcribe(samples, language=lang, hint=note["hint"], progress=on_asr)
     except Exception:
         if engine.name == "sensevoice":
             raise
@@ -111,17 +143,14 @@ def process(nid: str) -> None:
         log.error("engine %s failed, falling back to SenseVoice: %s", engine.name, traceback.format_exc())
         engine = engines.get("sensevoice")
         db.update_note(nid, touch=False, engine=engine.label + " (대체)")
-        _stage(nid, "asr")
-        pieces = engine.transcribe(samples, language=lang, hint=note["hint"],
-                                   progress=lambda f: _stage(nid, "asr", f))
+        prog["asr"] = 0.0
+        pieces = engine.transcribe(samples, language=lang, hint=note["hint"], progress=on_asr)
     log.info("asr %s: %d pieces in %.1fs", nid, len(pieces), time.time() - t0)
-
     turns = []
-    if settings["diarization"] and note["num_speakers"] != 1 and pieces:
-        _stage(nid, "diarize")
-        turns = diarize.diarize(samples, num_speakers=note["num_speakers"] or 0,
-                                threshold=float(settings["diarization_threshold"]),
-                                progress=lambda f: _stage(nid, "diarize", f))
+    if diar_thread:
+        diar_thread.join()
+        turns = diar_result.get("turns", [])
+        log.info("diarization %s: %d turns (%.1fs total)", nid, len(turns), time.time() - t0)
     _stage(nid, "finish")
     assigned = diarize.assign(pieces, turns)
     paras, n_spk = diarize.renumber(diarize.paragraphs(assigned))

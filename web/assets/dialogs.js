@@ -1,5 +1,5 @@
 import { h, icon, api, modal, toast, uploadFile, download, fmtDur, promptDialog } from './util.js';
-import { S, go, reloadAll, refreshState, applyTheme } from './app.js';
+import { S, go, reloadAll, refreshState, applyTheme, askNotificationPermission } from './app.js';
 
 export const LANGS = [['ko', '한국어'], ['en', 'English'], ['ja', '日本語'], ['zh', '中文'], ['auto', '자동 감지']];
 export const TYPES = [['meeting', '회의'], ['interview', '인터뷰'], ['lecture', '강의'], ['call', '통화'], ['memo', '개인 메모']];
@@ -50,6 +50,7 @@ export function openUpload(initial = []) {
   }
   async function submit() {
     go_.disabled = true;
+    askNotificationPermission();
     const fields = { language: lang.value, num_speakers: spk.value, note_type: type.value, hint: hint.value, folder_id: folder.value };
     let last = null;
     const rows = list.querySelectorAll('.file-row');
