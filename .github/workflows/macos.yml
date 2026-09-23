@@ -1,0 +1,63 @@
+name: macOS app
+
+on:
+  push:
+    branches: [claude/voice-meeting-notes]
+  workflow_dispatch:
+
+jobs:
+  mac:
+    runs-on: macos-14   # Apple Silicon
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install (same script users run)
+        run: bash scripts/install.sh
+
+      - name: Unit, API and pipeline tests
+        run: |
+          ~/.local/bin/uv pip install --python .venv/bin/python pytest
+          .venv/bin/python -m pytest -q tests
+
+      - name: Native app was compiled
+        run: |
+          APP="$HOME/Applications/회의노트.app"
+          if [ -f build-swift.log ]; then cat build-swift.log; exit 1; fi
+          file "$APP/Contents/MacOS/MeetNote" | tee /dev/stderr | grep -q "Mach-O"
+          plutil -lint "$APP/Contents/Info.plist"
+          codesign -dv "$APP" 2>&1 | head -5
+
+      - name: App launches and starts the engine
+        run: |
+          "$HOME/Applications/회의노트.app/Contents/MacOS/MeetNote" > app.log 2>&1 &
+          APP_PID=$!
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:8765/api/state > state.json; then break; fi
+            sleep 1
+          done
+          cat state.json | head -c 400; echo
+          grep -q '"version"' state.json
+          kill $APP_PID || true
+          sleep 3
+          ! curl -sf http://127.0.0.1:8765/api/state  # engine stops with the app
+
+      - name: Whisper (MLX, Apple GPU) transcribes real Korean speech
+        run: |
+          .venv/bin/python - <<'PY'
+          import time
+          from meetnote import audio, config, engines
+          config.save_settings({"asr_engine": "whisper-mlx", "whisper_model": "large-v3-turbo"})
+          eng = engines.get()
+          assert eng.name == "whisper-mlx", eng.name
+          x = audio.decode("tests/fixtures/two_speakers_ko.m4a")
+          t = time.time()
+          segs = eng.transcribe(x, language="ko", hint="")
+          print(f"{time.time() - t:.1f}s for {len(x) / 16000:.0f}s audio")
+          text = " ".join(s["text"] for s in segs)
+          for s in segs:
+              print(s["start"], s["end"], s["text"], len(s["words"]))
+          for phrase in ("지하철", "부모", "주민등록증"):
+              assert phrase in text, phrase
+          assert all(s["words"] for s in segs), "word timestamps missing"
+          PY

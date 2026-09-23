@@ -40,7 +40,7 @@ if [ "$(uname)" = "Darwin" ]; then
   bash "$ROOT/scripts/build_app.sh"
   bold "✓ 설치 완료 — Launchpad 또는 ~/Applications 에서 '회의노트'를 실행하세요."
   echo "  처음 녹음할 때 마이크 권한을 묻습니다. '허용'을 눌러 주세요."
-  open "$HOME/Applications/회의노트.app" || true
+  [ -n "${CI:-}" ] || open "$HOME/Applications/회의노트.app" || true
 else
   bold "✓ 설치 완료 — 실행: $ROOT/.venv/bin/python -m meetnote"
 fi
