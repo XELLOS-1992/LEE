@@ -281,6 +281,7 @@ button.chip:hover { background: var(--accent-weak); color: var(--accent-text); }
 .add-btn:hover { color: var(--accent-text); border-color: var(--accent); }
 .inp.mini { height: 26px; font-size: 12px; width: 120px; padding: 0 8px; }
 input[type=range], input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
+.sum-foot .usage { font-variant-numeric: tabular-nums; }
 .sum-foot { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; margin-top: 6px; padding: 0 2px; }
 .minutes { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 26px 26px 30px; }
 .minutes h1 { font-size: 20px; margin: 0 0 14px; letter-spacing: -.4px; }

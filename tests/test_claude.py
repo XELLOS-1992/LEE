@@ -29,7 +29,9 @@ class FakeStream:
             "open_issues": [], "keywords": ["출시", "마케팅 예산"],
             "participants": [{"name": "김팀장", "summary": "회의 진행"}],
         }
-        return SimpleNamespace(stop_reason="end_turn",
+        usage = SimpleNamespace(input_tokens=1200, output_tokens=900, cache_creation_input_tokens=3000,
+                                cache_read_input_tokens=0)
+        return SimpleNamespace(stop_reason="end_turn", model="claude-opus-5", usage=usage,
                                content=[SimpleNamespace(type="text", text=json.dumps(body, ensure_ascii=False))])
 
 
@@ -57,6 +59,24 @@ def test_claude_summary_request_and_parse(monkeypatch):
     assert req["output_config"]["format"]["type"] == "json_schema"
     assert "[00:35] 이대리: 마케팅 예산은" in req["messages"][0]["content"]
     assert "예산 재확인" in req["messages"][0]["content"]
+    assert req["system"][0]["cache_control"] == {"type": "ephemeral"}
+
+
+def test_usage_is_recorded_with_cost(monkeypatch):
+    from meetnote import db
+    db.init()
+    calls = []
+    monkeypatch.setattr(summarize, "_claude_client", lambda s: fake_client(calls))
+    config.save_settings({"llm_provider": "claude"})
+    try:
+        summarize.summarize({"id": "usage-note", "note_type": "meeting", "language": "ko"},
+                            meeting_segments(), {0: "김팀장", 1: "이대리"})
+    finally:
+        config.save_settings({"llm_provider": "auto"})
+    u = db.usage_summary("usage-note")
+    assert u["n"] == 1 and u["inp"] == 4200 and u["out"] == 900
+    # 1200 in x $5 + 3000 cache-write x $6.25 + 900 out x $25, per million
+    assert abs(u["cost"] - (1200 * 5 + 3000 * 6.25 + 900 * 25) / 1e6) < 1e-9
 
 
 def test_schema_is_strict():

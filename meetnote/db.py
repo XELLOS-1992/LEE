@@ -74,6 +74,18 @@ CREATE TABLE IF NOT EXISTS bookmarks (
   created_at REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_bookmarks_note ON bookmarks(note_id);
+CREATE TABLE IF NOT EXISTS usage (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  note_id TEXT,
+  kind TEXT NOT NULL,                     -- summary | chat
+  model TEXT NOT NULL,
+  input_tokens INTEGER DEFAULT 0,
+  output_tokens INTEGER DEFAULT 0,
+  cache_write_tokens INTEGER DEFAULT 0,
+  cache_read_tokens INTEGER DEFAULT 0,
+  cost_usd REAL DEFAULT 0,
+  created_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS chats (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   note_id TEXT NOT NULL,
@@ -420,3 +432,28 @@ def list_chats(nid: str) -> list[dict]:
 def clear_chats(nid: str) -> None:
     with tx() as c:
         c.execute("DELETE FROM chats WHERE note_id=?", (nid,))
+
+
+# ---------------------------------------------------------------- API usage
+
+def add_usage(note_id, kind, model, inp, out, cw, cr, cost) -> None:
+    with tx() as c:
+        c.execute(
+            "INSERT INTO usage (note_id, kind, model, input_tokens, output_tokens, cache_write_tokens, "
+            "cache_read_tokens, cost_usd, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+            (note_id, kind, model, inp, out, cw, cr, cost, now()),
+        )
+
+
+def usage_summary(note_id: str | None = None) -> dict:
+    import datetime as _dt
+    month = _dt.datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0).timestamp()
+    q = ("SELECT COUNT(*) n, COALESCE(SUM(input_tokens+cache_write_tokens+cache_read_tokens),0) inp, "
+         "COALESCE(SUM(output_tokens),0) out, COALESCE(SUM(cost_usd),0) cost FROM usage WHERE ")
+    c = conn()
+    if note_id:
+        return dict(c.execute(q + "note_id=?", (note_id,)).fetchone())
+    return {
+        "month": dict(c.execute(q + "created_at>=?", (month,)).fetchone()),
+        "all": dict(c.execute(q + "1=1").fetchone()),
+    }

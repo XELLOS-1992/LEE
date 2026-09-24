@@ -214,6 +214,12 @@ export async function openSettings(tab = 'asr') {
       const olStatus = h('span', { class: 'hint' }, '확인 중…');
       p.push(h('div', { class: 'grid2' }, h('div', { class: 'field' }, h('label', null, 'Ollama 주소'), olUrl, olStatus),
         h('div', { class: 'field' }, h('label', null, 'Ollama 모델'), olModel, dl, h('span', { class: 'hint' }, '예: exaone3.5:7.8b, qwen2.5:14b'))));
+      const useEl = h('span', null, '불러오는 중…');
+      api('/api/usage').then((u) => {
+        const f = (x) => `${x.n}회 · 입력 ${x.inp.toLocaleString()} / 출력 ${x.out.toLocaleString()} 토큰 · 약 $${x.cost.toFixed(2)}`;
+        useEl.textContent = `이번 달 ${f(u.month)} (누적 $${u.all.cost.toFixed(2)})`;
+      });
+      p.push(row('Claude 사용량', null, h('div', { style: { fontSize: '12.5px', color: 'var(--text-2)', textAlign: 'right' } }, useEl)));
       p.push(row('변환 후 자동 요약', '받아쓰기가 끝나면 바로 AI 요약을 만듭니다', sw(s.auto_summary, (v) => save({ auto_summary: v }))));
     } else if (tab === 'rec') {
       const micSel = h('select', { class: 'sel', onchange: (e) => { localStorage.setItem('mn.mic', e.target.value); toast('다음 녹음부터 적용됩니다'); } }, h('option', { value: '' }, '시스템 기본 마이크'));

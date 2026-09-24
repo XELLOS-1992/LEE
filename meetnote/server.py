@@ -112,6 +112,11 @@ def patch_settings(patch: dict = Body(...)):
     return config.public_settings()
 
 
+@app.get("/api/usage")
+def usage(note: str | None = None):
+    return db.usage_summary(note) if note else db.usage_summary()
+
+
 @app.get("/api/ollama/models")
 def ollama_models():
     s = config.load_settings()

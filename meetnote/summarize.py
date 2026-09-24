@@ -178,14 +178,32 @@ def _claude_client(s: dict):
     return anthropic.Anthropic(api_key=key) if key else anthropic.Anthropic()
 
 
-def _claude_call(s: dict, system: str, messages: list[dict], schema: dict | None, max_tokens: int = 32000) -> str:
+# USD per million tokens (input, output). Cache writes cost 1.25x input,
+# cache reads 0.1x input. Thinking tokens are billed as output.
+PRICES = {
+    "claude-opus-5": (5.0, 25.0),
+    "claude-sonnet-5": (2.0, 10.0),
+    "claude-haiku-4-5": (1.0, 5.0),
+}
+
+
+def usage_cost(model: str, inp: int, out: int, cache_write: int = 0, cache_read: int = 0) -> float:
+    pin, pout = next((v for k, v in PRICES.items() if model.startswith(k)), PRICES["claude-opus-5"])
+    return (inp * pin + cache_write * pin * 1.25 + cache_read * pin * 0.1 + out * pout) / 1_000_000
+
+
+def _claude_call(s: dict, system: str, messages: list[dict], schema: dict | None, max_tokens: int = 32000,
+                 note_id: str | None = None, kind: str = "summary") -> str:
     import anthropic
 
     client = _claude_client(s)
     output_config: dict = {"effort": "medium"}
     if schema:
         output_config["format"] = {"type": "json_schema", "schema": schema}
-    kwargs = dict(model=s["claude_model"], max_tokens=max_tokens, system=system, messages=messages,
+    # The transcript sits in the system prompt; caching it makes follow-up
+    # questions about the same meeting ~90% cheaper on input.
+    system_blocks = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+    kwargs = dict(model=s["claude_model"], max_tokens=max_tokens, system=system_blocks, messages=messages,
                   thinking={"type": "adaptive"}, output_config=output_config)
     try:
         # Server-side fallback reroutes a safety-classifier refusal to another model.
@@ -195,6 +213,7 @@ def _claude_call(s: dict, system: str, messages: list[dict], schema: dict | None
     except anthropic.BadRequestError:
         with client.messages.stream(**kwargs) as stream:
             msg = stream.get_final_message()
+    _record_usage(msg, s["claude_model"], note_id, kind)
     if msg.stop_reason == "refusal":
         raise RuntimeError("Claude가 이 요청의 처리를 거절했습니다.")
     text = "".join(b.text for b in msg.content if b.type == "text")
@@ -203,11 +222,29 @@ def _claude_call(s: dict, system: str, messages: list[dict], schema: dict | None
     return text
 
 
+def _record_usage(msg, requested_model: str, note_id, kind) -> None:
+    u = getattr(msg, "usage", None)
+    if u is None:
+        return
+    val = lambda name: int(getattr(u, name, 0) or 0)  # noqa: E731
+    inp, out = val("input_tokens"), val("output_tokens")
+    cw, cr = val("cache_creation_input_tokens"), val("cache_read_input_tokens")
+    model = getattr(msg, "model", None) or requested_model
+    if not isinstance(model, str):
+        model = requested_model
+    try:
+        from . import db
+        db.add_usage(note_id, kind, model, inp, out, cw, cr, usage_cost(model, inp, out, cw, cr))
+    except Exception:
+        log.exception("could not record usage")
+
+
 def _claude(note, segments, speakers, s) -> dict:
     system = _instructions(note, speakers)
     body = transcript_text(segments, speakers)
     extra = f"\n\n참고 메모:\n{note['memo']}" if note.get("memo") else ""
-    text = _claude_call(s, system, [{"role": "user", "content": f"<transcript>\n{body}\n</transcript>{extra}"}], SCHEMA)
+    text = _claude_call(s, system, [{"role": "user", "content": f"<transcript>\n{body}\n</transcript>{extra}"}], SCHEMA,
+                        note_id=note.get("id"), kind="summary")
     return json.loads(text)
 
 
@@ -257,7 +294,7 @@ def answer(note: dict, segments: list[dict], speakers: dict[int, str], history: 
     if provider == "claude":
         msgs = [{"role": h["role"], "content": h["content"]} for h in history[-10:]]
         msgs.append({"role": "user", "content": question})
-        return _claude_call(s, system, msgs, None, max_tokens=8000).strip()
+        return _claude_call(s, system, msgs, None, max_tokens=8000, note_id=note.get("id"), kind="chat").strip()
     if provider == "ollama":
         convo = "\n".join(f"{'Q' if h['role'] == 'user' else 'A'}: {h['content']}" for h in history[-6:])
         return _ollama_chat(s, system, (convo + "\nQ: " + question).strip(), None).strip()

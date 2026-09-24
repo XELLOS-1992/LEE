@@ -461,7 +461,9 @@ export async function renderNote(main, id, opts = {}) {
             partSum[nameOf(i)] ? h('div', { style: { fontSize: '12.5px', color: 'var(--text-2)' } }, partSum[nameOf(i)]) : null)))));
     }
     if (!E) {
-      out.push(h('div', { class: 'sum-foot' }, icon('sparkle', 'sm'), V.note.summary_provider || '', h('span', { class: 'spacer' }),
+      const usageEl = h('span', { class: 'usage', title: '이 노트의 요약·AI 질문에 쓴 Claude 토큰 (입력/출력)과 예상 비용' });
+      api(`/api/usage?note=${id}`).then((u) => { if (u.n) usageEl.textContent = `· 토큰 ${fmtK(u.inp)}/${fmtK(u.out)} · $${u.cost.toFixed(3)}`; }).catch(() => {});
+      out.push(h('div', { class: 'sum-foot' }, icon('sparkle', 'sm'), V.note.summary_provider || '', usageEl, h('span', { class: 'spacer' }),
         h('button', { class: 'btn ghost sm', onclick: () => { V.editSummary = true; renderSide(); } }, icon('edit', 'sm'), '편집'),
         h('button', { class: 'btn ghost sm', onclick: () => copyText(summaryText()) }, icon('copy', 'sm'), '복사'),
         h('button', { class: 'btn ghost sm', onclick: resummarize }, icon('refresh', 'sm'), '다시 요약')));
@@ -906,6 +908,8 @@ export async function renderNote(main, id, opts = {}) {
     ro.disconnect();
   };
 }
+
+function fmtK(n) { return n >= 10000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString(); }
 
 function modalLite(title, body, onOk, okLabel = '확인') {
   const m = modal({
